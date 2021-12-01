@@ -1,0 +1,437 @@
+<!DOCTYPE aesl-source>
+<network>
+
+
+<!--list of global events-->
+
+
+<!--list of constants-->
+<constant value="4000" name="black"/>
+<constant value="0" name="RED"/>
+<constant value="1" name="GREEN"/>
+<constant value="2" name="BLUE"/>
+<constant value="3" name="WHITE"/>
+<constant value="0" name="CAPTURE_PATTERN"/>
+<constant value="1" name="FOLLOW_THE_LINE"/>
+<constant value="2" name="SCAN"/>
+<constant value="3" name="BACK"/>
+<constant value="4" name="TURN_RIGHT"/>
+<constant value="5" name="FORWARD"/>
+<constant value="6" name="KEEP_FORWARD"/>
+<constant value="7" name="TURN_LEFT"/>
+<constant value="8" name="KEEP_TURN_RIGHT"/>
+<constant value="32" name="LED"/>
+<constant value="1" name="HIT"/>
+<constant value="0" name="MISS"/>
+<constant value="4" name="NULL"/>
+<constant value="9" name="STOP"/>
+<constant value="10" name="KEEP_TURN_LEFT"/>
+<constant value="11" name="FIND_LOCATION"/>
+<constant value="12" name="BACK_TO_FINISH_1"/>
+<constant value="13" name="BACK_TO_FINISH_2"/>
+<constant value="14" name="GO_BACK"/>
+<constant value="15" name="GO_LEFT"/>
+<constant value="16" name="GO_BACK_TO_FINISH"/>
+<constant value="17" name="GO_LEFT_2"/>
+<constant value="18" name="GO_BACK_TO_FINISH_2"/>
+
+
+<!--show keywords state-->
+<keywords flag="true"/>
+
+
+<!--node thymio-II-->
+<node nodeId="1" name="thymio-II">var capture_pattern
+var state
+var pattern
+var world[8] = [0, 1, 0, 0, 0, 1, 1, 0]
+var beliefs[8]
+var temp
+var sum
+var hit
+var i
+var detected = 0
+var x = 0
+var plus = 0
+var time = 0
+var y = 0
+var find = 0
+var back = 0
+var z = 0
+
+onevent button.backward
+	callsub stop
+	
+onevent button.right
+	callsub capture_pattern
+	callsub color_LED
+	call math.fill(beliefs, 1000/8)
+	callsub display_beliefs
+
+onevent button.forward
+	callsub follow_the_line
+
+onevent prox
+	if state == FOLLOW_THE_LINE and prox.horizontal[0] >= 2500 and prox.horizontal[4] >= 2500 then
+		callsub scan
+		callsub color_LED2
+		#callsub stop
+		callsub back
+		callsub compare
+		callsub count
+		#callsub back_to_finish
+	end
+	if state == FORWARD and prox.ground.delta[0] &lt;= 10 then
+		callsub keep_forward
+	end
+	if  state == FORWARD and prox.horizontal[2] >= 1000 then
+		callsub keep_turn_right
+	end
+	if state == TURN_LEFT and prox.ground.delta[0] &lt;= 10 then
+		callsub keep_turn_left
+	end
+
+onevent timer0
+	if state == CAPTURE_PATTERN and timer.period[0] >= 2000 then
+		timer.period[0] = 0
+		call leds.top(0, 0, 0)
+	end
+	if  state == BACK and timer.period[0] >= 500 then
+		timer.period[0] = 0
+		callsub turn_right
+	end
+	if state == KEEP_FORWARD and timer.period[0] >= 1100 then
+		timer.period[0] = 0
+		#motor.left.target = 0
+		#motor.right.target = 0
+		callsub turn_left
+	end
+	if state == KEEP_TURN_RIGHT and timer.period[0] >= 925 then
+		timer.period[0] = 0
+		callsub forward
+	end
+	if state == GO_BACK and timer.period[0] >= 3500 then
+		timer.period[0] = 0
+		callsub go_left
+	end
+	if state == GO_BACK_TO_FINISH and timer.period[0] >= 3500 then
+		timer.period[0] = 0
+		motor.left.target = 0
+		motor.right.target = 0
+		callsub calculate
+		callsub display
+	end
+	if  state == GO_LEFT_2 and timer.period[0] >= 920 then
+		timer.period[0] = 0
+		callsub go_back_to_finish_2
+		#motor.left.target = 0
+		#motor.right.target = 0
+		#callsub follow_the_line
+	end
+
+onevent timer1
+	if state == TURN_RIGHT and timer.period[1] >= 930 then
+		timer.period[1] = 0
+		callsub forward
+	end
+	if state == KEEP_TURN_LEFT and timer.period[1] >= 35 then
+		timer.period[1] = 0
+		#motor.left.target = 0
+		#motor.right.target = 0
+		callsub follow_the_line
+	end
+	if state == GO_LEFT and timer.period[1] >= 920 then
+		timer.period[1] = 0
+		callsub go_back_to_finish
+	end
+	if state == GO_BACK_TO_FINISH_2 and timer.period[1] >= 3500 then
+		timer.period[1] = 0
+		motor.left.target = 0
+		motor.right.target = 0
+		callsub calculate
+		callsub display
+	end
+
+sub stop
+	state = STOP
+	motor.left.target = 0
+	motor.right.target = 0
+	timer.period[1] = 0
+	timer.period[0] = 0
+	call leds.circle(0, 0, 0, 0, 0, 0, 0, 0)
+	#call leds.top(0, 0, 0)
+
+sub capture_pattern
+	state = CAPTURE_PATTERN
+	if prox.horizontal[1] > black and prox.horizontal[2] &lt;= black and prox.horizontal[3] > black then
+		capture_pattern = RED
+	end
+	if  prox.horizontal[1] &lt;= black and prox.horizontal[2] &lt;= black and prox.horizontal[3] > black then
+		capture_pattern = GREEN
+	end
+	if prox.horizontal[1] &lt;= black and prox.horizontal[2] > black and prox.horizontal[3] &lt;= black then
+		capture_pattern = BLUE
+	end
+	if prox.horizontal[1] > black and prox.horizontal[2] > black and prox.horizontal[3] &lt;= black then
+		capture_pattern = WHITE
+	end
+	if prox.horizontal[1] > black and prox.horizontal[2] > black and prox.horizontal[3] > black then
+		capture_pattern = NULL
+	end
+	
+sub follow_the_line
+	state = FOLLOW_THE_LINE
+	motor.left.target = 200
+	motor.right.target = 200
+
+sub scan
+	if prox.horizontal[1] > black and prox.horizontal[2] &lt;= black and prox.horizontal[3] > black then
+		pattern = RED
+	end
+	if  prox.horizontal[1] &lt;= black and prox.horizontal[2] &lt;= black and prox.horizontal[3] > black then
+		pattern = GREEN
+	end
+	if prox.horizontal[1] &lt;= black and prox.horizontal[2] > black and prox.horizontal[3] &lt;= black then
+		pattern = BLUE
+	end
+	if prox.horizontal[1] > black and prox.horizontal[2] > black and prox.horizontal[3] &lt;= black then
+		pattern = WHITE
+	end
+	if prox.horizontal[1] > black and prox.horizontal[2] > black and prox.horizontal[3] > black then
+		pattern = NULL
+	end
+
+sub color_LED
+	if capture_pattern == RED then
+		call leds.top(32, 0, 0)
+	end
+	if capture_pattern == GREEN then
+		call leds.top(0, 32, 0)
+	end
+	if capture_pattern == BLUE then
+		call leds.top(0, 0, 32)
+	end
+	if  capture_pattern == WHITE then
+		call leds.top(32, 32, 32)
+	end
+	if  pattern == NULL then
+		call leds.top(0, 0, 0)
+	end
+	timer.period[0] = 2000
+
+sub color_LED2
+	if pattern == RED then
+		call leds.top(32, 0, 0)
+	end
+	if pattern == GREEN then
+		call leds.top(0, 32, 0)
+	end
+	if pattern == BLUE then
+		call leds.top(0, 0, 32)
+	end
+	if  pattern == WHITE then
+		call leds.top(32, 32, 32)
+	end
+	if  pattern == NULL then
+		call leds.top(0, 0, 0)
+	end
+	timer.period[0] = 2000
+	
+sub display_beliefs
+	call leds.circle(beliefs[0]/LED, beliefs[1]/LED, beliefs[2]/LED, beliefs[3]/LED, beliefs[4]/LED, beliefs[5]/LED, beliefs[6]/LED, beliefs[7]/LED)
+
+sub rotate
+	temp = beliefs[7]
+	for i in 7:1 step -1 do 
+		beliefs[i] = beliefs[i-1]
+	end
+	beliefs[0] = temp
+	
+sub sense
+	if prox.ground.delta[1] &lt; 400 then
+		hit = 1
+	else
+		hit = 0
+	end
+	for i in 0:7 do
+		if (hit == 1 and world[i] == 1) or (hit == 0 and world[i] == 0) then
+			call math.mul(beliefs[i], beliefs[i], HIT)
+		else
+			call math.mul(beliefs[i], beliefs[i], MISS)
+		end
+	end
+	callsub normalize
+
+sub normalize	
+	sum = 0
+	for i in 0:7 do
+		sum += beliefs[i]	
+	end
+	for i in 0:7 do
+		call math.muldiv(beliefs[i], beliefs[i], 1000, sum)
+	end
+
+sub back
+	state = BACK
+	motor.left.target = -200
+	motor.right.target = -200
+	timer.period[0] = 500
+
+sub turn_right
+	state = TURN_RIGHT
+	motor.left.target = 200
+	motor.right.target = -200
+	timer.period[1] = 930
+
+sub forward
+	state = FORWARD
+	motor.left.target = 200
+	motor.right.target = 200
+	if detected == 0 then
+		callsub rotate
+		callsub sense
+		callsub display_beliefs
+		callsub find_location
+	end
+	detected = 1
+
+sub keep_forward
+	detected = 0
+	state = KEEP_FORWARD
+	motor.left.target = 200
+	motor.right.target = 200
+	timer.period[0] = 1100
+
+sub turn_left
+	state = TURN_LEFT
+	motor.left.target = -200
+	motor.right.target = 200
+
+sub keep_turn_left
+	state = KEEP_TURN_LEFT
+	motor.left.target = -200
+	motor.right.target = 200
+	timer.period[1] = 35
+
+sub keep_turn_right
+	state = KEEP_TURN_RIGHT
+	motor.left.target = 200
+	motor.right.target = -200
+	timer.period[0] = 925
+
+sub compare
+	if pattern == capture_pattern then
+		plus = 1
+	end
+	if plus == 1 and state == BACK then
+		x += 1
+	end
+
+sub count
+	if state == BACK then
+		time += 1
+	end
+
+sub find_location
+	if state == FORWARD and time >= 8 then
+		state = FIND_LOCATION
+		find = 1
+		for i in 0:7 do
+			if beliefs[i] == 1000 then
+				y = i+1
+			end
+		end
+	end
+	if find == 1 then
+		callsub back_to_finish
+	end
+
+sub back_to_finish
+	find = 0
+	if state == FIND_LOCATION then
+		find = 1
+		if y == 1 or y == 3 or y== 5 or y == 7 then
+			state = BACK_TO_FINISH_1
+		end
+		if y == 2 or y == 4 or y == 6 or y == 8 then
+			state = BACK_TO_FINISH_2
+		end
+	end
+	if find == 1 and state == BACK_TO_FINISH_1 then
+		callsub go_back
+	end
+	if find == 1 and state == BACK_TO_FINISH_2 then
+		callsub go_left_2
+	end
+
+sub go_back
+	state = GO_BACK
+	motor.left.target = -200
+	motor.right.target = -200
+	timer.period[0] = 3500
+
+sub go_left
+	state = GO_LEFT
+	motor.left.target = -200
+	motor.right.target = 200
+	timer.period[1] = 920
+
+sub go_back_to_finish
+	state = GO_BACK_TO_FINISH
+	motor.left.target = -200
+	motor.right.target = -200
+	timer.period[0] = 3500
+
+sub go_left_2
+	state = GO_LEFT_2
+	motor.left.target = -200
+	motor.right.target = 200
+	timer.period[0] = 920
+
+sub go_back_to_finish_2
+	state = GO_BACK_TO_FINISH_2
+	motor.left.target = -200
+	motor.right.target = -200
+	timer.period[1] = 3500
+
+sub calculate
+	if y-x &lt; 0 then
+		z = y-x+9
+	end
+	if y-x >= 0 and y-x != 7 then
+		z = y-x+1
+	end
+	if y-x == 7 then
+		z = y-x
+	end
+	
+sub display
+	if z == 1 then
+		call leds.circle(1000, 0, 0, 0, 0, 0, 0, 0)
+	end
+	if z == 2 then
+		call leds.circle(0, 1000, 0, 0, 0, 0, 0, 0)
+	end
+	if z == 3 then
+		call leds.circle(0, 0, 1000, 0, 0, 0, 0, 0)
+	end
+	if z == 4 then
+		call leds.circle(0, 0, 0, 1000, 0, 0, 0, 0)
+	end
+	if z == 5 then
+		call leds.circle(0, 0, 0, 0, 1000, 0, 0, 0)
+	end
+	if z == 6 then
+		call leds.circle(0, 0, 0, 0, 0, 1000, 0, 0)
+	end
+	if z == 7 then
+		call leds.circle(0, 0, 0, 0, 0, 0, 1000, 0)
+	end
+	if z == 8 then
+		call leds.circle(0, 0, 0, 0, 0, 0, 0, 1000)
+	end
+
+</node>
+
+
+</network>

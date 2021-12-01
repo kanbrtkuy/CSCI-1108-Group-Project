@@ -1,0 +1,160 @@
+<!DOCTYPE aesl-source>
+<network>
+
+
+<!--list of global events-->
+
+
+<!--list of constants-->
+<constant value="0" name="STOP"/>
+<constant value="1" name="FORWARD_0"/>
+<constant value="2" name="TURN_RIGHT_0"/>
+<constant value="3" name="FORWARD_1"/>
+<constant value="4" name="KEEP_FORWARD"/>
+<constant value="5" name="TURNING"/>
+<constant value="6" name="FORWARD_2"/>
+<constant value="7" name="TURN_LEFT_0"/>
+<constant value="8" name="PUSH"/>
+<constant value="0" name="PASS_1"/>
+<constant value="1" name="PASS_2"/>
+<constant value="9" name="FORWARD_3"/>
+
+
+<!--show keywords state-->
+<keywords flag="true"/>
+
+
+<!--node thymio-II-->
+<node nodeId="1" name="thymio-II">var state
+var pass
+var min
+var max
+var mean
+
+onevent button.backward
+	callsub stop
+	
+onevent button.left
+	callsub forward_0
+	callsub pass_1
+
+onevent button.right
+	callsub forward_2
+	callsub pass_1
+
+onevent prox
+	call math.stat(prox.horizontal[0:4], min, max, mean)
+	if state == FORWARD_1 and (prox.ground.delta[0] &lt;= 400 or prox.ground.delta[1] &lt;= 400) then
+		callsub keep_forward
+	#elseif state == TURNING and prox.horizontal[1] == 3000 and prox.horizontal[2] == 4000 and prox.horizontal[3] == 3000 then
+		#callsub stop
+	end
+	if state == TURNING and (prox.ground.delta[0] &lt;= 120 or prox.ground.delta[0] &lt;= 120) then
+		callsub forward_3
+	end
+
+onevent timer0
+	if state == FORWARD_0 and timer.period[0] >= 1000 then
+		timer.period[0] = 0
+		callsub turn_right_0
+	elseif state == TURN_RIGHT_0 and timer.period[0] >= 110 then
+		timer.period[0] = 0
+		callsub forward_1
+	elseif state == KEEP_FORWARD and timer.period[0] >= 1000 then
+		timer.period[0] = 0
+		callsub turning
+	elseif state == FORWARD_2 and timer.period[0] >= 1000 then
+		timer.period[0] = 0
+		callsub turn_left_0
+	elseif state == TURN_LEFT_0 and timer.period[0] >= 128 then
+		timer.period[0] = 0
+		callsub forward_1
+	elseif state == FORWARD_3 and timer.period[0] >= 350 then
+		timer.period[0] = 0
+		callsub turning
+	end
+
+onevent timer1
+	if pass == PASS_1 and timer.period[1] >= 30000 then
+		timer.period[1] = 0
+		callsub pass_2
+	elseif pass == PASS_2 and timer.period[1] >= 30000 then
+		timer.period[1] = 0
+		callsub stop_1
+	end
+
+sub stop
+	state = STOP
+	timer.period[0] = 0
+	motor.left.target = 0
+	motor.right.target = 0
+
+sub forward_0
+	state = FORWARD_0
+	motor.left.target = 300
+	motor.right.target = 300
+	timer.period[0] = 1000
+
+sub forward_2
+	state = FORWARD_2
+	motor.left.target = 300
+	motor.right.target = 300
+	timer.period[0] = 1000
+
+sub turn_right_0
+	state = TURN_RIGHT_0
+	motor.left.target = 300
+	motor.right.target = -300
+	timer.period[0] = 110
+	
+sub turn_left_0
+	state = TURN_LEFT_0
+	motor.left.target = -300
+	motor.right.target = 300
+	timer.period[0] = 128
+
+sub forward_1
+	state = FORWARD_1
+	motor.left.target = 300
+	motor.right.target = 300
+	
+sub keep_forward
+	state = KEEP_FORWARD
+	motor.left.target = 300
+	motor.right.target = 300
+	timer.period[0] = 1000
+	
+sub turning
+	state = TURNING
+	motor.left.target = 500
+	motor.right.target = -500
+	
+sub push
+	state = PUSH
+	motor.left.target = 500
+	motor.right.target = 500
+	timer.period[0] = 2000
+	
+sub pass_1
+	pass = PASS_1
+	timer.period[1] = 30000
+
+sub pass_2
+	pass = PASS_2
+	timer.period[1] = 30000
+
+sub forward_3
+	state = FORWARD_3
+	motor.left.target = 500
+	motor.right.target = 500
+	timer.period[0] = 350
+
+sub stop_1
+	motor.left.target = 0
+	motor.right.target = 0
+	timer.period[0] = 0
+	timer.period[1] = 0
+	call leds.circle(1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000)</node>
+
+
+</network>
